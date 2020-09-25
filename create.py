@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 """ Script para la creación de los vídeos de la PyconES 2020
+    El resultado se guarda como nombre del vídeo principal
 
-  El Script necesita:
-  1. Foto de inicio : foto_inicio.png que será la que se utilizará para crear el video inicial 5s
-  2. Vídeo principal
-  3. Vídeo final: por defecto video_end.mp4
+    Suponemos que los vídeos están numerados y las carátulas empiezan
+    con la numeración de los vídeos.
 
-  El resultado se guarda como nombre del vídeo principal
+    El sistema intentará encontrar la mejor resolución de carátula para el vídeo,
+    pero no realiza control de errores.
 
-  Para simplificar supondremos que se sigue la convención:
+    Vídeos y carátula deben estar en el mismo directorio
 
-  Foto inicio: video_principal.png
-  Vídeo principal: video_principal.mp4
 """
 
 from moviepy.editor import concatenate_videoclips
@@ -20,9 +18,7 @@ from pathlib import Path
 import argparse
 
 def info(nombre):
-    nombre = Path(nombre).stem
-    num = nombre.split('-')[0]
-    info = VideoFileClip('{}.mp4'.format(nombre)).subclip(0, 5)
+    info = VideoFileClip(nombre).subclip(0, 5)
     print ("info: h: {}, w: {}".format(info.h, info.w))
 
 
@@ -38,9 +34,8 @@ def generate():
 
 def convert(nombre):
     # Obetenemos resolución
-    nombre = Path(nombre).stem
+    info = VideoFileClip(nombre).subclip(0, 5)
     num = nombre.split('-')[0]
-    info = VideoFileClip('{}.mp4'.format(nombre)).subclip(0, 5)
     res = info.h
 
     # Generamos la entradilla
@@ -53,11 +48,11 @@ def convert(nombre):
 
     # Generamos vídeo final
     clip1 = VideoFileClip('{}_start.mp4'.format(entradilla.stem))
-    clip2 = VideoFileClip('{}.mp4'.format(nombre))
+    clip2 = VideoFileClip(nombre)
     clip3 = VideoFileClip('end_{}.mp4'.format(res))
-
     final = concatenate_videoclips([clip1, clip2, clip3], method="compose")
-    final.write_videofile('{}_final.mp4'.format(nombre))
+    Path('./final').mkdir(exist_ok=True)
+    final.write_videofile('./final/{}'.format(nombre))
     final.close()
 
 if __name__ == '__main__':
