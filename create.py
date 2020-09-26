@@ -10,15 +10,25 @@
 
     Vídeos y carátula deben estar en el mismo directorio
 
+    El resultado en el directorio final con el mismo nombre del vídeo.
+
+    Si establecemos la variable a DEBUG solamente se generará el vído de NUM_SECONDS de duracion
+
 """
 
 from moviepy.editor import concatenate_videoclips
 from moviepy.editor import VideoFileClip, ImageClip
+from PIL import Image
+import numpy as np
 from pathlib import Path
 import argparse
 
+from numpy.core.fromnumeric import size
+NUM_SECONDS = 5
+DEBUG = False
+
 def info(nombre):
-    info = VideoFileClip(nombre).subclip(0, 5)
+    info = VideoFileClip(nombre).subclip(0, NUM_SECONDS)
     print ("info: h: {}, w: {}".format(info.h, info.w))
 
 
@@ -27,29 +37,70 @@ def generate():
     for png in Path('.').glob('end_*.png'):
         nombre = png.stem
         res = nombre.split('_')[1]
-        clip = ImageClip(png.name).set_duration(5)
+        clip = ImageClip(png.name).set_duration(NUM_SECONDS)
         clip.write_videofile('{}.mp4'.format(nombre, res), fps=24)
         print ("info: h: {}, w: {}".format(clip.h, clip.w))
         clip.close()
 
+def generar_caratulas(num, clip_size):
+    """generar_caratulas
+
+        Genera y devuelve los vídeos de inicio y fin a partir
+        de las imágnes de portada y finalización.
+
+        (width, height)
+
+    """
+    inicio_mp4, fin_mp4 = None, None
+
+    # generamos la imagen final
+    out="end_{}.mp4".format(clip_size[1])
+    if not Path(out).exists():
+        im = Image.open('end_1440.png')
+        im.resize(clip_size, Image.ANTIALIAS)
+        name="end_{}.png".format(clip_size[0])
+        im.save(name, "PNG")
+        clip = ImageClip(name).set_duration(NUM_SECONDS)
+        out="end_{}.mp4".format(clip_size[1])
+        clip.write_videofile(out, fps=24)
+        clip.close()
+    fin_mp4 = Path(out)
+
+    for png in Path('.').glob('{}-*_1440.png'.format(num)):
+        im = Image.open(png.name)
+        im.resize(clip_size, Image.ANTIALIAS)
+        name_png="{}_{}_start.png".format(png.stem, clip_size[1])
+        im.save(name_png, "PNG")
+
+        clip = ImageClip(name_png).set_duration(NUM_SECONDS)
+        name_mp4 = '{}_{}_start.mp4'.format(png.stem, clip_size[1])
+        clip.write_videofile(name_mp4, fps=24)
+        clip.close()
+        inicio_mp4 = Path(name_mp4)
+        break
+    return inicio_mp4, fin_mp4
+
 def convert(nombre):
     # Obetenemos resolución
-    info = VideoFileClip(nombre).subclip(0, 5)
-    num = nombre.split('-')[0]
+    info = VideoFileClip(nombre).subclip(0, NUM_SECONDS)
+    size = (info.w, info.h)
     res = info.h
 
-    # Generamos la entradilla
-    for png in Path('.').glob('{}-*_{}.png'.format(num, res)):
-        clip = ImageClip(png.name).set_duration(5)
-        clip.write_videofile('{}_start.mp4'.format(png.stem), fps=24)
-        clip.close()
-        entradilla = png
+    # obtenemos número del vídeo
+    num = nombre.split('-')[0]
+
+    # Generamos las carátulas
+
+    entradilla, fin  = generar_caratulas(num, size)
 
 
     # Generamos vídeo final
-    clip1 = VideoFileClip('{}_start.mp4'.format(entradilla.stem))
-    clip2 = VideoFileClip(nombre)
-    clip3 = VideoFileClip('end_{}.mp4'.format(res))
+    clip1 = VideoFileClip(entradilla.name, target_resolution = (info.h,info.w))
+    if DEBUG:
+        clip2 = VideoFileClip(nombre, target_resolution = (info.h, info.w)).subclip(0, NUM_SECONDS)
+    else:
+        clip2 = VideoFileClip(nombre, target_resolution = (info.h, info.w))
+    clip3 = VideoFileClip(fin.name, target_resolution = (info.h, info.w))
     final = concatenate_videoclips([clip1, clip2, clip3], method="compose")
     Path('./final').mkdir(exist_ok=True)
     final.write_videofile('./final/{}'.format(nombre))
